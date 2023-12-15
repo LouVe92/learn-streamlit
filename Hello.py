@@ -14,38 +14,92 @@
 
 import streamlit as st
 from streamlit.logger import get_logger
-
 LOGGER = get_logger(__name__)
 
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+st.set_page_config(page_title="Data Quality", layout="wide")
 
-    st.write("# Welcome to Streamlit! 👋")
+st.title("Data Quality")
+st.markdown("""
+            ***Hello!:hand: Welcome to OMNI Classifier Data Quality Dashboard!***
+            """)
 
-    st.sidebar.success("Select a demo above.")
+st.caption('I am currently working with csv file. Link to Azure Blob is still under maintenance.')  
+uploaded_file = st.file_uploader('Please upload your csv file below :point_down:', type='csv')
+df= pd.read_csv(uploaded_file)
 
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
+st.header('Prerun Check', divider='gray')
+st.markdown(':red[Under maintenance]')
 
+st.header('Data Profiler', divider='gray')
+st.markdown("""
+            **👈 Select a data level from the sidebar** to filter the data
+            """)
 
-if __name__ == "__main__":
-    run()
+level = st.sidebar.selectbox('Select a data level', 
+                              options=sorted(df['level'].unique()),
+                              index=None)
+df_selection = df.query('level == @level')
+
+if level == 'Category':
+    sub_level = st.sidebar.selectbox('Select a category name', 
+                                  options=sorted(df_selection['category'].unique()),
+                                  index=None)
+    df_sub_selection = df_selection[df_selection['category'] == sub_level]
+elif level == 'Application':
+    sub_level = st.sidebar.selectbox('Select an application name', 
+                                  options=sorted(df_selection['category'].unique()),
+                                  index=None)
+    df_sub_selection = df_selection[df_selection['category'] == sub_level]
+else:
+    df_sub_selection = df_selection
+
+df_sub_selection_size = df_sub_selection[df_sub_selection['name'] =='Size']
+df_sub_selection_cnt_msisdn = df_sub_selection[(df_sub_selection['name'] =='CountDistinct') & (df_sub_selection['instance'] =='msisdn')]
+df_sub_selection_cnt_session = df_sub_selection[(df_sub_selection['name'] =='CountDistinct') & (df_sub_selection['instance'] =='session')]
+
+metrics = ['Maximum', 'Minimum', 'Mean', 'Sum', 'StandardDeviation', 
+           'ApproxQuantiles-0.25', 'ApproxQuantiles-0.5', 'ApproxQuantiles-0.75']
+filtered_df = {}
+for metric in metrics:
+    condition = df_sub_selection[df_sub_selection['name'] == metric]
+    if not condition.empty:
+      condition = condition.astype(bool)
+      filtered_df[metric] = df_sub_selection[condition]
+filtered_df_max = filtered_df['Maximum']
+filtered_df_min = filtered_df['Minimum']
+filtered_df_sum = filtered_df['Sum']
+filtered_df_mean = filtered_df['Mean']
+filtered_df_sd = filtered_df['StandardDeviation']
+filtered_df_q1 = filtered_df['ApproxQuantiles-0.25']
+filtered_df_q2 = filtered_df['ApproxQuantiles-0.5']
+filtered_df_q3 = filtered_df['ApproxQuantiles-0.75']
+
+if level in ['All', 'Category', 'Application']:
+    st.subheader('Size')
+    st.markdown(':blue[To analyze the total number of rows in the table]')
+    fig, ax = plt.subplots()
+    sns.lineplot(data=df_sub_selection_size, x='date', y ='value', ax=ax)
+    st.pyplot(fig)
+
+    st.subheader('Count Distinct')
+    st.markdown(':blue[To analyze the total distinct number of values in a specific column]')
+    st.markdown(':red[msisdn]')
+    fig, ax = plt.subplots()
+    sns.lineplot(data=df_sub_selection_cnt_msisdn, x='date', y ='value', ax=ax)
+    st.pyplot(fig)
+    st.markdown(':red[session]')
+    fig, ax = plt.subplots()
+    sns.lineplot(data=df_sub_selection_cnt_session, x='date', y ='value', ax=ax)
+    st.pyplot(fig)
+
+    st.subheader('Metric')
+    st.markdown(':blue[To analyze metrics function on the specific column]')
+
+    st.subheader('Completeness')
+    st.markdown(':blue[To analyze data completeness in a specific column]')
+
